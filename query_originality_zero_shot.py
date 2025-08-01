@@ -26,15 +26,16 @@ def QuestionGenerator(prompt_file):
     return question_list, full_dataset
 
 
-def getOutputs(path, timestamp, question, keyword):
+def getOutputs(path, timestamp, seed=0):
     folder_path = f"tmp/{path}/{timestamp}"
     output_file = os.path.join(folder_path, "output.jsonl")
     with open(output_file, 'r') as f:
         lines = f.readlines()
         
+    np.random.seed(seed)
     originality_scores = [
-        int(json.loads(line)['choices'][0]['message']['content'].strip()[0])
-        if json.loads(line)['choices'][0]['message']['content'].strip()[0].isdigit()
+        int(json.loads(line)['choices'][0]['message']['content'].strip()[-1])
+        if json.loads(line)['choices'][0]['message']['content'].strip()[-1].isdigit()
         else np.random.randint(5)
     for line in lines]
     
@@ -45,13 +46,9 @@ if __name__ == "__main__":
     questions, full_dataset = QuestionGenerator("zero-shot")
     # timestamp = test(questions, temperature_list=[0,])
     timestamp = "20250728_220035"
-    originality_scores = getOutputs("test", timestamp, "", "")
+    originality_scores = getOutputs("test", timestamp)
     
-    result_path = "Data/llm_result.csv"
-    if os.path.exists(result_path):
-        result_df = pd.read_csv(result_path)
-        result_df.loc[:, 'gpt-4-turbo-0s'] = originality_scores
-    else:
-        sub_dataset = full_dataset[['ProblemID', 'Solutions', 'FacScoresO', 'set']]
-        sub_dataset.loc[:, 'gpt-4-turbo-0s'] = originality_scores
-        sub_dataset.to_csv(result_path, index=False)
+    result_path = "Data/llm_result_zeroshot.csv"
+    full_dataset.loc[:, 'gpt-4-turbo-0s'] = originality_scores
+    sub_dataset = full_dataset[['ProblemID', 'Solutions', 'FacScoresO', 'set', 'gpt-4-turbo-0s']]
+    sub_dataset.to_csv(result_path, index=False)
