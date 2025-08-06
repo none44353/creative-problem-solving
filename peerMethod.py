@@ -82,9 +82,14 @@ def get_sementic_similarity(ID, mode = "DSI"):
         return similarities.tolist()
     
     elif mode == "DSI":
-        df = pd.read_csv('Data/CPSTfulldataset2.csv')
+        df = pd.read_csv('Data/final.csv', encoding= "utf-8-sig")
         dsi_values = df[df['ProblemID'] == ID]['DSI'].tolist()
         return dsi_values
+    
+    elif mode == "prompt-DSI":
+        df = pd.read_csv('Data/final.csv',  encoding= "utf-8-sig")
+        prompt_dsi_values = df[df['ProblemID'] == ID]['prompt-DSI'].tolist()
+        return prompt_dsi_values
 
 def get_peer_distance(ID, solutions_list, mode, number_of_peers = 0):
     if number_of_peers == 0:
@@ -126,13 +131,18 @@ def get_peer_distance(ID, solutions_list, mode, number_of_peers = 0):
             avg_score = sum(scores) / len(scores) if scores else 0.0
             avg_jaccard_scores.append(avg_score)
         return avg_jaccard_scores
+    
+    elif mode == "DSI":
+        df = pd.read_csv('Data/final.csv',  encoding= "utf-8-sig")
+        dsi_values = df[df['ProblemID'] == ID]['peer-DSI'].tolist()
+        return dsi_values
 
 def correlation_with_k_peers(k_values, solutions_list, ID, fac_scores, cutoff):
     distance1 = get_sementic_similarity(ID, mode="cosine_distance")
     correlations = []
     
     for k in k_values:
-        distance2 = get_peer_distance(solutions_list=solutions_list, mode="cosine_distance", number_of_peers=k)
+        distance2 = get_peer_distance(ID, solutions_list=solutions_list, mode="cosine_distance", number_of_peers=k)
         
         lam = 0.6
         preds = [(1 - lam) * d1 + lam * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is cosine_distance
@@ -163,8 +173,8 @@ def build_df(problem_list, lambdas):
         solutions_list = solutions.tolist()
         print(f"Processing ProblemID: {ID} with {len(solutions_list)} solutions.")
 
-        distance1 = get_sementic_similarity(ID, mode="DSI")
-        distance2 = get_peer_distance(ID, solutions_list=solutions_list, mode="cosine_distance")
+        distance1 = get_sementic_similarity(ID, mode="cosine_distance")
+        distance2 = get_peer_distance(ID, solutions_list=solutions_list, mode="DSI")
         for lamb in lambdas:
             #prediction = [(1 - lamb) * d1 - lamb * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is Jaccard
             prediction = [(1 - lamb) * d1 + lamb * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is cosine_distance
@@ -184,7 +194,7 @@ def compute_correlation_with_filter(df, filter_condition, prediction_column, met
     predictions = filtered_df[prediction_column]
     metric = filtered_df[metric_column]
     
-    print(filter_condition, len(filtered_df), len(predictions))
+    print(f"filter_condition: {filter_condition} + Number of predictions: {len(predictions)}")
     
     cutoff = 4 / (len(filtered_df) - 2) if len(filtered_df) > 2 else 0.1
     
@@ -209,7 +219,7 @@ if __name__ == "__main__":
             if set_name == 'all':
                 filter_cond = "index >= 0"
             elif set_name in problem_list:
-                filter_cond = f"ProblemID == '{set_name}'"
+                filter_cond = f"ProblemID == '{set_name}' and set != 'training'"
             else:
                 filter_cond = f"set == '{set_name}'"
             corr = compute_correlation_with_filter(df, filter_cond, prediction_col, metric_column='FacScoresO')
@@ -221,8 +231,14 @@ if __name__ == "__main__":
 
     lambda_correlation_df = pd.DataFrame(correlation_table, columns=set_names)
     lambda_correlation_df.insert(0, 'lambda', lambdas)
-    lambda_correlation_df.to_csv('Data/Ours/result-DSI.csv', index=False)
-    print("Lambda correlation results saved.")
+    
+    def highlight_max(s):
+        is_max = s == s.max()
+        return ['color: red' if v else '' for v in is_max]
+
+    styled_df = lambda_correlation_df.style.apply(highlight_max, axis=0)
+    styled_df.to_excel('Data/Ours/result-promptcosD+DSI.xlsx', index=False, engine='openpyxl')
+    print("Colored Excel with max values saved.")
 
 
 # fac_scores = df[df['ProblemID'] == ID]['FacScoresO'].tolist()
