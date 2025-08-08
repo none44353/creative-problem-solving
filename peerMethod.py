@@ -203,42 +203,72 @@ def compute_correlation_with_filter(df, filter_condition, prediction_column, met
     return pearson_corr
 
 
+def calc_values(problem_list):
+    df = pd.read_csv('Data/final.csv', encoding="utf-8-sig")
+
+    # 预先创建这两列并设置默认值，以避免潜在的类型问题
+    df['promptCosDis'] = float('nan')
+    df['peerCosDis'] = float('nan')
+
+    for ID in problem_list:
+        solutions_mask = (df['ProblemID'] == ID)
+        solutions = df.loc[solutions_mask, 'Story']
+        solutions_list = solutions.tolist()
+        print(f"Processing ProblemID: {ID} with {len(solutions_list)} solutions.")
+
+        if not solutions_list:
+            continue
+
+        promptCosDis = get_sementic_similarity(ID, mode="cosine_distance")
+        peerCosDis = get_peer_distance(ID, solutions_list=solutions_list, mode="cosine_distance")
+
+        # 使用布尔掩码进行批量赋值，而不是在循环中逐行赋值
+        df.loc[solutions_mask, 'promptCosDis'] = promptCosDis
+        df.loc[solutions_mask, 'peerCosDis'] = peerCosDis
+        print(len(solutions), len(promptCosDis), len(peerCosDis))
+        print(promptCosDis[:5], peerCosDis[:5])
+
+    df.to_csv('Data/final2.csv', index=False, encoding="utf-8-sig")
+
 if __name__ == "__main__":
     problem_list = ["Acme", "Becky", "Clara", "Joan", "Mike", "Ralph"]
-    lambdas = [round(x * 0.1, 1) for x in range(11)]
-    df = build_df(problem_list, lambdas)
 
-    # 针对每个lambda值都计算相关系数，保存到表格
-    set_names = problem_list + ['test', 'heldout', 'all']
-    correlation_table = []
-
-    for lamb in lambdas:
-        row = []
-        prediction_col = f'prediction_{lamb}'
-        for set_name in set_names:
-            if set_name == 'all':
-                filter_cond = "index >= 0"
-            elif set_name in problem_list:
-                filter_cond = f"ProblemID == '{set_name}' and set != 'training'"
-            else:
-                filter_cond = f"set == '{set_name}'"
-            corr = compute_correlation_with_filter(df, filter_cond, prediction_col, metric_column='FacScoresO')
-            # 如果你想计算整个df的相关系数，可以将filter_cond设置为"index >= 0"
-            # 例如：
-            # filter_cond = "index >= 0"
-            row.append(corr)
-        correlation_table.append(row)
-
-    lambda_correlation_df = pd.DataFrame(correlation_table, columns=set_names)
-    lambda_correlation_df.insert(0, 'lambda', lambdas)
+    calc_values(problem_list)
     
-    def highlight_max(s):
-        is_max = s == s.max()
-        return ['color: red' if v else '' for v in is_max]
+    # lambdas = [round(x * 0.1, 1) for x in range(11)]
+    # df = build_df(problem_list, lambdas)
 
-    styled_df = lambda_correlation_df.style.apply(highlight_max, axis=0)
-    styled_df.to_excel('Data/Ours/result-promptcosD+DSI.xlsx', index=False, engine='openpyxl')
-    print("Colored Excel with max values saved.")
+    # # 针对每个lambda值都计算相关系数，保存到表格
+    # set_names = problem_list + ['test', 'heldout', 'all']
+    # correlation_table = []
+
+    # for lamb in lambdas:
+    #     row = []
+    #     prediction_col = f'prediction_{lamb}'
+    #     for set_name in set_names:
+    #         if set_name == 'all':
+    #             filter_cond = "index >= 0"
+    #         elif set_name in problem_list:
+    #             filter_cond = f"ProblemID == '{set_name}' and set != 'training'"
+    #         else:
+    #             filter_cond = f"set == '{set_name}'"
+    #         corr = compute_correlation_with_filter(df, filter_cond, prediction_col, metric_column='FacScoresO')
+    #         # 如果你想计算整个df的相关系数，可以将filter_cond设置为"index >= 0"
+    #         # 例如：
+    #         # filter_cond = "index >= 0"
+    #         row.append(corr)
+    #     correlation_table.append(row)
+
+    # lambda_correlation_df = pd.DataFrame(correlation_table, columns=set_names)
+    # lambda_correlation_df.insert(0, 'lambda', lambdas)
+    
+    # def highlight_max(s):
+    #     is_max = s == s.max()
+    #     return ['color: red' if v else '' for v in is_max]
+
+    # styled_df = lambda_correlation_df.style.apply(highlight_max, axis=0)
+    # styled_df.to_excel('Data/Ours/result-promptcosD+DSI.xlsx', index=False, engine='openpyxl')
+    # print("Colored Excel with max values saved.")
 
 
 # fac_scores = df[df['ProblemID'] == ID]['FacScoresO'].tolist()
