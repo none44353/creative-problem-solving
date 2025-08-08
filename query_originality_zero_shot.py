@@ -43,12 +43,18 @@ def getOutputs(path, timestamp, seed=0):
 
 
 if __name__ == "__main__":
+    model = "google/gemini-2.5-flash"
     questions, full_dataset = QuestionGenerator("zero-shot")
-    # timestamp = test(questions, temperature_list=[0,])
-    timestamp = "20250728_220035"
+    timestamp = test(questions, temperature_list=[0,], model_list=[model,])
+    # timestamp = "20250728_220035"
     originality_scores = getOutputs("test", timestamp)
     
     result_path = "Data/llm_result_zeroshot.csv"
-    full_dataset.loc[:, 'gpt-4-turbo-0s'] = originality_scores
-    sub_dataset = full_dataset[['ProblemID', 'Solutions', 'FacScoresO', 'set', 'gpt-4-turbo-0s']]
-    sub_dataset.to_csv(result_path, index=False)
+    if os.path.exists(result_path):
+        result_df = pd.read_csv(result_path)
+        result_df.loc[:, f"{model.split('/')[-1]}-0s"] = originality_scores
+        result_df.to_csv(result_path, index=False)
+    else:
+        full_dataset.loc[:, f"{model.split('/')[-1]}-0s"] = originality_scores
+        sub_dataset = full_dataset[['ProblemID', 'Solutions', 'FacScoresO', 'set', f"{model.split('/')[-1]}-0s"]]
+        sub_dataset.to_csv(result_path, index=False)

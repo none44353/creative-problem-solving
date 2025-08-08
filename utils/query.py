@@ -149,7 +149,7 @@ def _query_openai(data, logger, client):
         return None
 
 
-def test(questions, logprobs=False, top_logprobs=None, temperature_list=None):
+def test(questions, model_list, logprobs=False, top_logprobs=None, temperature_list=None):
     """
     Test function to validate the 'query' function's handling of multiple requests, 
     ensuring responses match input order and expected answers.
@@ -186,12 +186,13 @@ def test(questions, logprobs=False, top_logprobs=None, temperature_list=None):
             "logprobs": logprobs,
         }
         for question in questions
-        for model in [
-            "openai/gpt-4-turbo"
-            # "openai/gpt-4o-mini-2024-07-18"
-            # "openai/gpt-4o-2024-11-20"
-            # "google/gemini-2.0-flash-001"
-        ]
+        for model in model_list
+        # for model in [
+        #     # "openai/gpt-4-turbo"
+        #     # "openai/gpt-4o-mini-2024-07-18"
+        #     # "openai/gpt-4o-2024-11-20"
+        #     "google/gemini-2.5-flash"
+        # ]
     ]
     if top_logprobs is not None:
         for data in test_data:

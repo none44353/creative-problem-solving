@@ -50,8 +50,8 @@ def getOutputs(path, timestamp, seed=0):
         
     np.random.seed(seed)
     originality_scores = [
-        int(json.loads(line)['choices'][0]['message']['content'].strip()[0])
-        if json.loads(line)['choices'][0]['message']['content'].strip()[0].isdigit()
+        int(json.loads(line)['choices'][0]['message']['content'].strip()[-1])
+        if json.loads(line)['choices'][0]['message']['content'].strip()[-1].isdigit()
         else np.random.randint(4)
     for line in lines]
     
@@ -59,19 +59,21 @@ def getOutputs(path, timestamp, seed=0):
 
 
 if __name__ == "__main__":
-    for example_num in (10, 20):
+    # model = "google/gemini-2.5-flash"
+    model = "openai/gpt-4-turbo"
+    for timestamp, example_num in zip(("20250731_100014", "20250731_113603", "20250731_113713"), (5, 10, 20)):
         questions, heldout_dataset = QuestionGenerator("few-shot", example_num=example_num)
         print(questions[-1], end='\n\n')
-        timestamp = test(questions, temperature_list=[0,])
+        # timestamp = test(questions, temperature_list=[0,], model_list=[model,])
         # timestamp = "20250731_100014"
         originality_scores = getOutputs("test", timestamp)
         
         result_path = "Data/llm_result_fewshot.csv"
         if os.path.exists(result_path):
             result_df = pd.read_csv(result_path)
-            result_df.loc[:, f'gpt-4-turbo-{example_num}s'] = originality_scores
+            result_df.loc[:, f"{model.split('/')[-1]}-{example_num}s"] = originality_scores
             result_df.to_csv(result_path, index=False)
         else:
-            heldout_dataset.loc[:, f'gpt-4-turbo-{example_num}s'] = originality_scores
-            sub_dataset = heldout_dataset[['ProblemID', 'Solutions', 'FacScoresO', 'set', f'gpt-4-turbo-{example_num}s']]
+            heldout_dataset.loc[:, f"{model.split('/')[-1]}-{example_num}s"] = originality_scores
+            sub_dataset = heldout_dataset[['ProblemID', 'Solutions', 'FacScoresO', 'set', f"{model.split('/')[-1]}-{example_num}s"]]
             sub_dataset.to_csv(result_path, index=False)
