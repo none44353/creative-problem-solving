@@ -59,12 +59,11 @@ def getOutputs(path, timestamp, seed=0):
 
 
 if __name__ == "__main__":
-    # model = "google/gemini-2.5-flash"
-    model = "openai/gpt-4-turbo"
-    for timestamp, example_num in zip(("20250731_100014", "20250731_113603", "20250731_113713"), (5, 10, 20)):
+    model = "google/gemini-2.5-flash"
+    for example_num in (5, 10, 20):
         questions, heldout_dataset = QuestionGenerator("few-shot", example_num=example_num)
         print(questions[-1], end='\n\n')
-        # timestamp = test(questions, temperature_list=[0,], model_list=[model,])
+        timestamp = test(questions, temperature_list=[0,], model_list=[model,])
         # timestamp = "20250731_100014"
         originality_scores = getOutputs("test", timestamp)
         

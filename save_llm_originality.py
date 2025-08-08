@@ -31,4 +31,4 @@ for csv_file in csv_file_list:
         print(" ".join(list(map(str, corr_list))))
         print()
 
-corr_result_df.to_csv("Data/llm_result_corr.csv")
+corr_result_df.loc[sorted(corr_result_df.index.tolist(), key=lambda name: (name.split('-')[:-1], int(name.split('-')[-1][:-1])))].to_csv("Data/llm_result_corr.csv")

@@ -5,3 +5,4 @@ __pycache__
 tmp/.DS_Store
 Data/.DS_Store
 Data/Ours/.DS_Store
+tmp
