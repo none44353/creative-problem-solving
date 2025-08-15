@@ -29,14 +29,14 @@ model = BertModel.from_pretrained("bert-large-uncased", output_hidden_states = T
 model.eval()
 segmenter = PunktSentenceTokenizer() # initialize segmenter: does sentence segmentation, returns list
 tokenizer = BertTokenizer.from_pretrained('bert-large-uncased') # initialize BERT tokenizer
-cos = torch.nn.CosineSimilarity(dim = 0)
+cos = torch.nn.CosineSimilarity(dim=0)
 
 print("Loading data...")  # print message to console
 
 # LOAD DATA
-d = pd.read_csv(filename, usecols = ["ID","Story"], encoding = "utf-8-sig")  
+d = pd.read_csv(filename, usecols=["ID", "Story"], encoding="utf-8-sig")  
 # d = d.head(1) # you can uncomment this if you want to do a trial run with only the first participant's story instead of the whole dataset
-out_df = pd.read_csv(filename, encoding= "utf-8-sig")  # load the original dataframe to merge DSI values back into it later
+out_df = pd.read_csv(filename, encoding="utf-8-sig")  # load the original dataframe to merge DSI values back into it later
 
 # CREATE STORAGE DICTIONARY # keys = participant IDs
 s = {}
@@ -53,6 +53,7 @@ for index, row in d.iterrows():
     ID = row["ID"]  # get current participant ID
     text = row["Story"]  # get current story
     s[ID] = {}  # add dict entry for subject and create nested dict to store subject data
+    import pdb; pdb.set_trace()
 
     # TRAIN SENTENCE SEGEMENTER AND SEGMENT SENTENCE
     segmenter.train(text) # train the segmenter on the text first (unsupervised algorithm that is pretrained and can improve with added training)
@@ -62,10 +63,10 @@ for index, row in d.iterrows():
     features = []  # initialize list to store dcos values, one for each sentence
     words = []
     for i in range(len(sentences)):  # loop over sentences
-        sentence = sentences[i].translate(str.maketrans('','',string.punctuation))
-        sent_tokens = tokenizer(sentence, max_length = 50, truncation = True, padding = 'max_length', return_tensors="pt")
+        sentence = sentences[i].translate(str.maketrans('', '', string.punctuation))
+        sent_tokens = tokenizer(sentence, max_length=50, truncation=True, padding='max_length', return_tensors="pt")
         sent_words = [tokenizer.decode([k]) for k in sent_tokens['input_ids'][0]]
-        sent_indices = np.where(np.in1d(sent_words, filter_list, invert = True))[0]  # we'll use this to filter out special tokens and punctuation
+        sent_indices = np.where(np.in1d(sent_words, filter_list, invert=True))[0]  # we'll use this to filter out special tokens and punctuation
         with torch.no_grad():
             sent_output = model(**sent_tokens) # feed model the sentence tokens and get outputs
             hids = sent_output.hidden_states # isolate hidden layer activations
@@ -81,13 +82,13 @@ for index, row in d.iterrows():
 
     # GET DCOS VALUES FOR STORY
     num_words = len(words) # number of words, in terms of hidden activation vectors (2*words)
-    lower_triangle_indices = np.tril_indices_from(np.random.rand(num_words, num_words), k = -1)  # creates a matrix that represents words*2 (i.e., from word representations from both layer 6+7) and gets the indices of the lower triangle, omitting diagonal (k = -1)A
+    lower_triangle_indices = np.tril_indices_from(np.random.rand(num_words, num_words), k=-1)  # creates a matrix that represents words*2 (i.e., from word representations from both layer 6+7) and gets the indices of the lower triangle, omitting diagonal (k = -1)A
     
     story_dcos_vals = []  # intialize storage for dcos of current sentence
     for k in range(len(lower_triangle_indices[0])): # loop over lower triangle indices
         features1 = features[lower_triangle_indices[0][k]]
         features2 = features[lower_triangle_indices[1][k]]
-        dcos = (1-cos(features1, features2))  # compute dcos
+        dcos = (1 - cos(features1, features2))  # compute dcos
         story_dcos_vals.append(dcos) # store dcos value in list
 
     mean_story_dcos = torch.mean(torch.stack(story_dcos_vals)).item()  # get average story dcos
@@ -97,9 +98,9 @@ for index, row in d.iterrows():
 print("DSI computation complete.")  # print message to console
 
 # MERGE OUTPUT WITH INPUT DATAFRAME
-dsi_df = pd.DataFrame.from_dict(s, orient = "index") # make pandas dataframe from DSI dictionary
+dsi_df = pd.DataFrame.from_dict(s, orient="index") # make pandas dataframe from DSI dictionary
 dsi_df["ID"] = dsi_df.index
-out_df = out_df.merge(dsi_df,left_on="ID", right_on="ID") # add DSI column to input dataframe
-out_df.to_csv('DSI_output.csv', index = False) # save updated dataframe
-elapsed_time = time.time()-start_time # get elapsed time to compute DSI values
+out_df = out_df.merge(dsi_df, left_on="ID", right_on="ID") # add DSI column to input dataframe
+out_df.to_csv('DSI_output.csv', index=False) # save updated dataframe
+elapsed_time = time.time() - start_time # get elapsed time to compute DSI values
 print('elapsed time: ' + str(elapsed_time)) # display elapsed time (in seconds)
