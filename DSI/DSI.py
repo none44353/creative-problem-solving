@@ -53,7 +53,6 @@ for index, row in d.iterrows():
     ID = row["ID"]  # get current participant ID
     text = row["Story"]  # get current story
     s[ID] = {}  # add dict entry for subject and create nested dict to store subject data
-    import pdb; pdb.set_trace()
 
     # TRAIN SENTENCE SEGEMENTER AND SEGMENT SENTENCE
     segmenter.train(text) # train the segmenter on the text first (unsupervised algorithm that is pretrained and can improve with added training)
