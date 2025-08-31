@@ -52,7 +52,6 @@ def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val):
 
     return correlation_after_removal
 
-
 def Jaccard(A, B):
     set_A = set(str(A).split())
     set_B = set(str(B).split())
@@ -71,10 +70,10 @@ def get_embeddings(ID):
     solutions_embeddings = loaded_embeddings[1:]
     return query_embedding, solutions_embeddings
 
-def get_sementic_similarity(ID, mode = "DSI"):
+def get_semantic_distance(ID, mode = "DSI"):
     if mode == "cosine_distance":
         query_embedding, solutions_embeddings = get_embeddings(ID)
-        similarities = cosine_similarity(
+        similarities = 1 - cosine_similarity(
             query_embedding.reshape(1, -1),
             solutions_embeddings
         )[0]
@@ -137,33 +136,33 @@ def get_peer_distance(ID, solutions_list, mode, number_of_peers = 0):
         dsi_values = df[df['ProblemID'] == ID]['peer-DSI'].tolist()
         return dsi_values
 
-def correlation_with_k_peers(k_values, solutions_list, ID, fac_scores, cutoff):
-    distance1 = get_sementic_similarity(ID, mode="cosine_distance")
-    correlations = []
+# def correlation_with_k_peers(k_values, solutions_list, ID, fac_scores, cutoff):
+#     distance1 = get_semantic_distance(ID, mode="cosine_distance")
+#     correlations = []
     
-    for k in k_values:
-        distance2 = get_peer_distance(ID, solutions_list=solutions_list, mode="cosine_distance", number_of_peers=k)
+#     for k in k_values:
+#         distance2 = get_peer_distance(ID, solutions_list=solutions_list, mode="cosine_distance", number_of_peers=k)
         
-        lam = 0.6
-        preds = [(1 - lam) * d1 + lam * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is cosine_distance
+#         lam = 0.6
+#         preds = [(1 - lam) * d1 + lam * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is cosine_distance
     
-        preds = np.array(preds)
-        preds = 4 * (preds - preds.min()) / (preds.max() - preds.min()) if preds.max() > preds.min() else np.zeros_like(preds)
+#         preds = np.array(preds)
+#         preds = 4 * (preds - preds.min()) / (preds.max() - preds.min()) if preds.max() > preds.min() else np.zeros_like(preds)
         
-        pearson_corr = calculate_correlation_after_outlier_removal(y_var=fac_scores, x_var=preds, cutoff_val=cutoff)
-        correlations.append(pearson_corr)
+#         pearson_corr = calculate_correlation_after_outlier_removal(y_var=fac_scores, x_var=preds, cutoff_val=cutoff)
+#         correlations.append(pearson_corr)
     
-    plt.figure(figsize=(8, 5))
-    plt.plot(k_values, correlations, marker='o', linestyle='-')
-    plt.xlabel('k_values')
-    plt.ylabel('Pearson Correlation')
-    plt.title('Correlation vs. Number of Peers (k)')
-    plt.grid(True)
-    for i, (k, corr) in enumerate(zip(k_values, correlations)):
-        plt.annotate(f'k={k}\n{corr:.2f}', (k, correlations[i]), textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
-    plt.show()
+#     plt.figure(figsize=(8, 5))
+#     plt.plot(k_values, correlations, marker='o', linestyle='-')
+#     plt.xlabel('k_values')
+#     plt.ylabel('Pearson Correlation')
+#     plt.title('Correlation vs. Number of Peers (k)')
+#     plt.grid(True)
+#     for i, (k, corr) in enumerate(zip(k_values, correlations)):
+#         plt.annotate(f'k={k}\n{corr:.2f}', (k, correlations[i]), textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
+#     plt.show()
     
-    return correlations
+#     return correlations
 
 def build_df(problem_list, lambdas):
     df = pd.read_csv('Data/CPSTfulldataset2.csv')
@@ -173,7 +172,7 @@ def build_df(problem_list, lambdas):
         solutions_list = solutions.tolist()
         print(f"Processing ProblemID: {ID} with {len(solutions_list)} solutions.")
 
-        distance1 = get_sementic_similarity(ID, mode="cosine_distance")
+        distance1 = get_semantic_distance(ID, mode="cosine_distance")
         distance2 = get_peer_distance(ID, solutions_list=solutions_list, mode="DSI")
         for lamb in lambdas:
             #prediction = [(1 - lamb) * d1 - lamb * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is Jaccard
@@ -219,7 +218,7 @@ def calc_values(problem_list):
         if not solutions_list:
             continue
 
-        promptCosDis = get_sementic_similarity(ID, mode="cosine_distance")
+        promptCosDis = get_semantic_distance(ID, mode="cosine_distance")
         peerCosDis = get_peer_distance(ID, solutions_list=solutions_list, mode="cosine_distance")
 
         # 使用布尔掩码进行批量赋值，而不是在循环中逐行赋值

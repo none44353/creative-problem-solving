@@ -1,11 +1,7 @@
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-
 from scipy.stats import pearsonr
-from matplotlib import pyplot as plt
-
-from utils.calculate_dist import get_semantic_similarity, get_peer_distance
 
 
 def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val):
@@ -52,50 +48,50 @@ def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val):
     mid_labels_mask = (df_cleaned['label'] >= lower_threshold) & (df_cleaned['label'] <= upper_threshold)
     mean_prediction_mid_labels = np.mean(np.abs(df_cleaned['prediction'][mid_labels_mask])) if np.any(mid_labels_mask) else np.nan
 
-    return correlation_after_removal
+    return correlation_after_removal, y_cleaned, x_cleaned
 
 
-def correlation_with_k_peers(k_values, solutions_list, ID, fac_scores, cutoff):
-    distance1 = get_semantic_similarity(ID, mode="cosine_distance")
-    correlations = []
+# def correlation_with_k_peers(k_values, solutions_list, ID, fac_scores, cutoff):
+#     distance1 = get_semantic_similarity(ID, mode="cosine_distance")
+#     correlations = []
     
-    for k in k_values:
-        distance2 = get_peer_distance(solutions_list=solutions_list, mode="cosine_distance", number_of_peers=k)
+#     for k in k_values:
+#         distance2 = get_peer_distance(solutions_list=solutions_list, mode="cosine_distance", number_of_peers=k)
         
-        lam = 0.6
-        preds = [(1 - lam) * d1 + lam * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is cosine_distance
+#         lam = 0.6
+#         preds = [(1 - lam) * d1 + lam * d2 for d1, d2 in zip(distance1, distance2)] # when distance2 is cosine_distance
     
-        preds = np.array(preds)
-        preds = 4 * (preds - preds.min()) / (preds.max() - preds.min()) if preds.max() > preds.min() else np.zeros_like(preds)
+#         preds = np.array(preds)
+#         preds = 4 * (preds - preds.min()) / (preds.max() - preds.min()) if preds.max() > preds.min() else np.zeros_like(preds)
         
-        pearson_corr = calculate_correlation_after_outlier_removal(y_var=fac_scores, x_var=preds, cutoff_val=cutoff)
-        correlations.append(pearson_corr)
+#         pearson_corr = calculate_correlation_after_outlier_removal(y_var=fac_scores, x_var=preds, cutoff_val=cutoff)
+#         correlations.append(pearson_corr)
     
-    plt.figure(figsize=(8, 5))
-    plt.plot(k_values, correlations, marker='o', linestyle='-')
-    plt.xlabel('k_values')
-    plt.ylabel('Pearson Correlation')
-    plt.title('Correlation vs. Number of Peers (k)')
-    plt.grid(True)
-    for i, (k, corr) in enumerate(zip(k_values, correlations)):
-        plt.annotate(f'k={k}\n{corr:.2f}', (k, correlations[i]), textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
-    plt.show()
+#     plt.figure(figsize=(8, 5))
+#     plt.plot(k_values, correlations, marker='o', linestyle='-')
+#     plt.xlabel('k_values')
+#     plt.ylabel('Pearson Correlation')
+#     plt.title('Correlation vs. Number of Peers (k)')
+#     plt.grid(True)
+#     for i, (k, corr) in enumerate(zip(k_values, correlations)):
+#         plt.annotate(f'k={k}\n{corr:.2f}', (k, correlations[i]), textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
+#     plt.show()
     
-    return correlations
+#     return correlations
 
 
-def compute_correlation_with_filter(df, filter_condition, prediction_column, metric_column='FacScoresO'):
-    # 示例用法
-    # corr = compute_correlation_with_filter(df, "ProblemID == 'Becky' and FacScoresO > 2", metric_column='FacScoresO')
-    # print(f"相关系数: {corr}")
-    filtered_df = df.query(filter_condition)
-    predictions = filtered_df[prediction_column]
-    metric = filtered_df[metric_column]
+# def compute_correlation_with_filter(df, filter_condition, prediction_column, metric_column='FacScoresO'):
+#     # 示例用法
+#     # corr = compute_correlation_with_filter(df, "ProblemID == 'Becky' and FacScoresO > 2", metric_column='FacScoresO')
+#     # print(f"相关系数: {corr}")
+#     filtered_df = df.query(filter_condition)
+#     predictions = filtered_df[prediction_column]
+#     metric = filtered_df[metric_column]
     
-    print(filter_condition, len(filtered_df), len(predictions))
+#     print(filter_condition, len(filtered_df), len(predictions))
     
-    cutoff = 4 / (len(filtered_df) - 2) if len(filtered_df) > 2 else 0.1
+#     cutoff = 4 / (len(filtered_df) - 2) if len(filtered_df) > 2 else 0.1
     
-    pearson_corr = calculate_correlation_after_outlier_removal(y_var=metric, x_var=predictions, cutoff_val=cutoff)
+#     pearson_corr = calculate_correlation_after_outlier_removal(y_var=metric, x_var=predictions, cutoff_val=cutoff)
     
-    return pearson_corr
+#     return pearson_corr
