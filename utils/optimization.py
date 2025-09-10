@@ -1,8 +1,9 @@
-from utils.calculate_corr import calculate_correlation_after_outlier_removal
+from utils.calculate_corr import calculate_correlation_after_outlier_removal, calculate_mse_after_outlier_removal
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_squared_error
+import pygad
+from scipy.optimize import minimize
 
 def get_tuple(data, dsi_type, prompt_type, peer_type):
     if dsi_type == "DSI":
@@ -22,28 +23,39 @@ def get_tuple(data, dsi_type, prompt_type, peer_type):
 
     return (dsi_value, prompt_value, peer_value, data.FacScoresO)
 
-def ExampleGenerator(full_dataset, problem_id, example_num, dsi_type, prompt_type, peer_type, seed=0):
+#【改动】：将第一个参数由full_dataset修改为train_dataset
+def ExampleGenerator(train_dataset, problem_id, example_num, dsi_type, prompt_type, peer_type, seed=0):
     assert isinstance(example_num, int) and example_num > 0, "example_num must be a positive integer"
-    train_dataset = full_dataset[full_dataset['set'] == 'training']
-
+    
     if problem_id != "Mike":
-        example_items = train_dataset[train_dataset['ProblemID'] == problem_id].sample(n=example_num, random_state=seed)
+        example_items = train_dataset[train_dataset['ProblemID'] == problem_id].sample(n=example_num, random_state=seed, replace=False) #强调不放回采样，每个元素在采样中只会出现一次
         examples = [get_tuple(example, dsi_type, prompt_type, peer_type) for example in example_items.itertuples()]
     elif problem_id == "Mike":
         selected_problem_id = train_dataset['ProblemID'].sample(n=1, random_state=seed).item()
-        example_items = train_dataset[train_dataset['ProblemID'] == selected_problem_id].sample(n=example_num, random_state=seed)
+        example_items = train_dataset[train_dataset['ProblemID'] == selected_problem_id].sample(n=example_num, random_state=seed, replace=False)
         # 修改：让Mike数据集也从自己的data里选
-        # example_items = full_dataset[full_dataset['ProblemID'] == 'Mike'].sample(n=example_num, random_state=seed)
+        # example_items = train_dataset[train_dataset['ProblemID'] == 'Mike'].sample(n=example_num, random_state=seed)
         examples = [get_tuple(example, dsi_type, prompt_type, peer_type) for example in example_items.itertuples()]
 
     return examples
 
-def get_data(full_dataset, problem_id, example_num, dsi_type = "DSI", prompt_type = "CosDis", peer_type = "CosDis", seed = 0):
-    examples = ExampleGenerator(full_dataset, problem_id, dsi_type=dsi_type, prompt_type=prompt_type, peer_type=peer_type, example_num=example_num, seed=seed)
+def get_data(full_dataset, problem_id, example_num, dsi_type = "DSI", prompt_type = "CosDis", peer_type = "CosDis", seed = 0, reallocate_testing_set = False):
+    if reallocate_testing_set:
+        '''针对出了Mike以外的每个数据集，从中随机采样example_num个样本作为训练集'''
+        train_dataset = pd.DataFrame()
+        for pid in full_dataset['ProblemID'].unique():
+            if pid != "Mike":
+                pid_data = full_dataset[full_dataset['ProblemID'] == pid]
+                train_samples = pid_data.sample(n=example_num, random_state=seed, replace=False)
+                train_dataset = pd.concat([train_dataset, train_samples])
+    else:
+        train_dataset = full_dataset[full_dataset['set'] == 'training']
+
+    examples = ExampleGenerator(train_dataset, problem_id, dsi_type=dsi_type, prompt_type=prompt_type, peer_type=peer_type, example_num=example_num, seed=seed)
     X_train = np.array([item[:-1] for item in examples])
     y_train = np.array([item[-1] for item in examples])
 
-    test_items = full_dataset[(full_dataset['ProblemID'] == problem_id) & (full_dataset['set'] != 'training')]
+    test_items = full_dataset[(full_dataset['ProblemID'] == problem_id) & (~full_dataset.index.isin(train_dataset.index))]
     test_data = [get_tuple(row, dsi_type, prompt_type, peer_type) for row in test_items.itertuples()]
     X_test = np.array([item[:-1] for item in test_data])
     y_test = np.array([item[-1] for item in test_data])
@@ -63,34 +75,72 @@ def get_key_parameters(X, key_parameters):
         Y.append(tuple(new_tuple))
     return Y
      
-# 用进化算法直接优化预测模型在training data上的correlation
-def fitness_function_template(ga_instance, solution, solution_idx, X_train, y_train, num_genes):
-    y_pred = np.dot(X_train, solution[:-1]) + solution[-1]
+# # 用进化算法直接优化预测模型在training data上的correlation
+# def fitness_function_template(ga_instance, solution, solution_idx, X_train, y_train, num_genes):
+#     y_pred = np.dot(X_train, solution[:-1]) + solution[-1]
 
-    cutoff = 4 / (len(y_train) - 2) if len(y_train) > 2 else 0.1
-    correlation_value = calculate_correlation_after_outlier_removal(y_train, y_pred, cutoff)
-    return correlation_value
+#     cutoff = 4 / (len(y_train) - 2) if len(y_train) > 2 else 0.1
+#     correlation_value = calculate_correlation_after_outlier_removal(y_train, y_pred, cutoff)
+#     return correlation_value
 
-# 假设这是用于运行进化算法的函数
-def genetic_algorithm(X_train, y_train, num_genes):
-    fitness_function = lambda ga_instance, solution, solution_idx: fitness_function_template(ga_instance, solution, solution_idx, X_train, y_train, num_genes)
+# # 假设这是用于运行进化算法的函数
+# def genetic_algorithm(X_train, y_train, num_genes):
+#     fitness_function = lambda ga_instance, solution, solution_idx: fitness_function_template(ga_instance, solution, solution_idx, X_train, y_train, num_genes)
 
-    ga_instance = pygad.GA(
-        num_generations=200,
-        num_parents_mating=20,
-        fitness_func=fitness_function,
-        sol_per_pop=40,
-        num_genes=num_genes,  # 对应 lambda1, lambda2, lambda3, lambda4
-        parent_selection_type="rws", #rws: 适应度越高的个体被选中的概率越大，sss: 选择适应度最高的个体
-        crossover_type="two_points",
-        mutation_type="random",
-        mutation_percent_genes="default"
-    )
+#     ga_instance = pygad.GA(
+#         num_generations=200,
+#         num_parents_mating=20,
+#         fitness_func=fitness_function,
+#         sol_per_pop=40,
+#         num_genes=num_genes,  # 对应 lambda1, lambda2, lambda3, lambda4
+#         parent_selection_type="rws", #rws: 适应度越高的个体被选中的概率越大，sss: 选择适应度最高的个体
+#         crossover_type="two_points",
+#         mutation_type="random",
+#         mutation_percent_genes="default"
+#     )
 
-    ga_instance.run()
-    best_solution, best_fitness, best_solution_idx = ga_instance.best_solution()
-    return best_solution
+#     ga_instance.run()
+#     best_solution, best_fitness, best_solution_idx = ga_instance.best_solution()
+#     return best_solution
     
+
+def optimize_linear_corr(X_train, y_train):
+    '''根据X_train和y_train训练一个线性回归模型，使用Scipy的自定义优化函数，目标是最大化预测值与真实值y_train之间的pearsonr相关系数'''
+    def objective(params):
+        weights = params[:-1]
+        intercept = params[-1]
+        y_pred = np.dot(X_train, weights) + intercept
+        cutoff = 4 / (len(y_train) - 2) if len(y_train) > 2 else 0.1
+        corr = calculate_correlation_after_outlier_removal(y_train, y_pred, cutoff)
+        # 目标是最大化相关系数，因此返回负值
+        return -corr
+
+    best_corr = -np.inf
+    best_solution = None
+    initial_params_list = [
+        np.concatenate(([1], np.zeros(X_train.shape[1]))),
+        np.concatenate(([-1], np.zeros(X_train.shape[1]))),
+    ]
+    # for _ in range(8):
+    #     rand_params = np.random.uniform(-1, 1, X_train.shape[1] + 1)
+    #     while np.allclose(rand_params, 0):
+    #         rand_params = np.random.uniform(-1, 1, X_train.shape[1] + 1)
+    #     initial_params_list.append(rand_params)
+        
+    for initial_params in initial_params_list:
+        result = minimize(objective, initial_params, method='BFGS')
+        current_corr = -result.fun
+        if current_corr > best_corr:
+            best_corr = current_corr
+            best_solution = result.x
+    return best_solution
+
+    initial_params = np.zeros(X_train.shape[1] + 1)
+    initial_params[0] = 1
+    result = minimize(objective, initial_params, method='BFGS')
+    
+    return result.x
+
 def calculate_performance(training_data, testing_data, parameters, optimization_goal):
     full_X_train, y_train = training_data
     full_X_test, y_test = testing_data
@@ -102,15 +152,30 @@ def calculate_performance(training_data, testing_data, parameters, optimization_
         model.fit(X_train, y_train)
         prediction = model.predict(X_test)
         print("Model coefficients & intercept:", model.coef_, model.intercept_)
-    elif optimization_goal == 'correlation':
-        solution = genetic_algorithm(X_train, y_train, num_genes= len(parameters) + 1)
-        prediction = np.dot(X_test, solution[:-1]) + solution[-1]
+
+        prediction_train = model.predict(X_train)
+        training_corr = calculate_correlation_after_outlier_removal(y_train, prediction_train)
+        training_mse = calculate_mse_after_outlier_removal(y_train, prediction_train)
+        print("Training Performance: MSE={}, CORR={}\n".format(training_mse, training_corr))
+    elif optimization_goal == 'CORR':
+        print("Training Data:", X_train[:5], y_train[:5])
+        solution = optimize_linear_corr(np.array(X_train), np.array(y_train))
+        prediction = np.dot(np.array(X_test), solution[:-1]) + solution[-1]
         print("Model coefficients & intercept:", solution)
         
-    prediction_scaled = 4 * (prediction - prediction.min()) / (prediction.max() - prediction.min()) if prediction.max() > prediction.min() else np.zeros_like(prediction)
-    # print("Predictions (first 5):", prediction_scaled[:5])
+        # prediction_train = np.dot(np.array(X_train), solution[:-1]) + solution[-1]
+        # training_corr = calculate_correlation_after_outlier_removal(y_train, prediction_train)
+        # training_mse = calculate_mse_after_outlier_removal(y_train, prediction_train)
+        # print("Training Performance: MSE={}, CORR={}".format(training_mse, training_corr))
         
-    cutoff = 4 / (len(y_test) - 2) if len(y_test) > 2 else 0.1
-    corr, y_test_clean, pred_clean = calculate_correlation_after_outlier_removal(y_test, prediction, cutoff)
-    mse = mean_squared_error(y_test_clean, pred_clean)
+        
+        # solution = genetic_algorithm(X_train, y_train, num_genes= len(parameters) + 1)
+        # prediction = np.dot(X_test, solution[:-1]) + solution[-1]
+        # print("Model coefficients & intercept:", solution)
+        
+    prediction_scaled = 4 * (prediction - prediction.min()) / (prediction.max() - prediction.min()) if prediction.max() > prediction.min() else np.zeros_like(prediction)
+    #print("Predictions (first 5):", prediction_scaled[:5])
+
+    corr = calculate_correlation_after_outlier_removal(y_test, prediction)
+    mse = calculate_mse_after_outlier_removal(y_test, prediction)
     return corr, mse

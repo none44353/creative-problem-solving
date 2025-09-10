@@ -2,39 +2,64 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy.stats import pearsonr
+from sklearn.metrics import mean_squared_error
 
-
-def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val):
+def data_after_outlier_removal(y_var, x_var, cutoff_val = None):
+    if cutoff_val is None:
+        cutoff_val = 4 / (len(y_var) - 2) if len(y_var) > 2 else 0.1
+    
     y_var = np.asarray(y_var)
     x_var = np.asarray(x_var)
-
     X = sm.add_constant(x_var)
-    # print(X[:3], y_var[:3])
     model = sm.OLS(y_var, X)
     fit_model = model.fit()
     cooks_dist = fit_model.get_influence().cooks_distance[0]
-
     # 找出 Cook's Distance 超过截断值的索引
     above_cutoff_indices = np.where(cooks_dist > cutoff_val)[0]
-
     # 移除异常值
     if len(above_cutoff_indices) > 0:
         x_cleaned = np.delete(x_var, above_cutoff_indices)
         y_cleaned = np.delete(y_var, above_cutoff_indices)
     else:
         x_cleaned = x_var
-        y_cleaned = y_var     
-    #print(f"Number of outliers removed: {len(above_cutoff_indices)}")
+        y_cleaned = y_var
 
+    return y_cleaned, x_cleaned
+
+def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val = None):
+    y_cleaned, x_cleaned = data_after_outlier_removal(y_var, x_var, cutoff_val)
     # 计算移除异常值后的 Pearson 相关系数
     if len(x_cleaned) > 1:
         correlation_after_removal, _ = pearsonr(y_cleaned, x_cleaned)
     else:
         correlation_after_removal = np.nan # 数据点不足，无法计算相关性
+    return correlation_after_removal
 
-    # 计算预测误差和相关统计量
+def calculate_mse_after_outlier_removal(y_var, x_var, cutoff_val = None):
+    y_cleaned, x_cleaned = data_after_outlier_removal(y_var, x_var, cutoff_val)
+    # 计算移除异常值后的均方误差
+    if len(x_cleaned) > 1:
+        mse_after_removal = mean_squared_error(y_cleaned, x_cleaned)
+    else:
+        mse_after_removal = np.nan # 数据点不足，无法计算均方误差
+    return mse_after_removal
+
+
+def show_statistic(dataset):
+    print("Size of Dataset:", len(dataset))
+    print("CORR DSI～FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['DSI']))
+    print("CORR promptCosDis～FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['promptCosDis']))
+    print("CORR peerCosDis～FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['peerCosDis']))
+    print("\n")
+    
+    return
+    
+    
+def performance_after_outlier_removal(y_var, x_var, cutoff_val = None):
+    y_cleaned, x_cleaned = data_after_outlier_removal(y_var, x_var, cutoff_val)
     df_cleaned = pd.DataFrame({'label': y_cleaned, 'prediction': x_cleaned})
 
+    # 计算预测误差和相关统计量
     mean_value = np.mean(df_cleaned['label'])
     sd_value = np.std(df_cleaned['label'])
     lower_threshold = mean_value - 2 * sd_value
@@ -48,8 +73,7 @@ def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val):
     mid_labels_mask = (df_cleaned['label'] >= lower_threshold) & (df_cleaned['label'] <= upper_threshold)
     mean_prediction_mid_labels = np.mean(np.abs(df_cleaned['prediction'][mid_labels_mask])) if np.any(mid_labels_mask) else np.nan
 
-    return correlation_after_removal, y_cleaned, x_cleaned
-
+    pass
 
 # def correlation_with_k_peers(k_values, solutions_list, ID, fac_scores, cutoff):
 #     distance1 = get_semantic_similarity(ID, mode="cosine_distance")
