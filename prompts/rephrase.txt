@@ -1,0 +1,10 @@
+You are tasked with rewriting a given text according to the following rules:
+
+1. Preserve the original meaning and structure as much as possible.
+2. Correct all grammatical errors and awkward phrasing.
+3. Most importantly, replace common words with rarer, more UNCOMMON alternatives wherever possible.
+
+Ensure the rewritten version remains faithful to the original intent and organization while maximizing the use of uncommon vocabulary. Output only the rewritten text, with no additional commentary or prefatory language.
+
+Here is the text:
+$text

@@ -40,7 +40,7 @@ def str_trans(param):
     else:
         raise ValueError("Unsupported parameter: {}".format(param))
 
-def draw(problem_ids, performance_values, performance_std, model_name, example_num, performance_metric, optimization_goal, file_path, save_pic=True):
+def draw(problem_ids, performance_values, performance_std, model_name, example_num, sample_num, performance_metric, optimization_goal, file_path, param_comb, save_pic=True):
     x = np.arange(len(problem_ids))
     width = 0.2
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -208,6 +208,4 @@ if __name__ == "__main__":
         performance_values = np.array(performance_values)
         performance_std = np.array(performance_std)
         
-        draw(problem_ids, performance_values, performance_std, model_name, example_num, performance_metric, optimization_goal, file_path, save_pic=True)
-    # print(performanceDict)
-    # drawLinePic(problem_ids, models, param_comb, performanceDict, save_pic=False)
+        draw(problem_ids, performance_values, performance_std, model_name, example_num, sample_num, performance_metric, optimization_goal, file_path, param_comb, save_pic=True)

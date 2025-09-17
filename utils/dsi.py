@@ -1,10 +1,13 @@
-from nltk.tokenize.punkt import PunktSentenceTokenizer
-from transformers import BertTokenizer, BertModel
-from sentence_transformers import SentenceTransformer
-import numpy as np
-import string
 import time
 import torch
+import string
+import numpy as np
+
+from tqdm import tqdm
+from transformers import BertTokenizer, BertModel
+from nltk.tokenize.punkt import PunktSentenceTokenizer
+from sentence_transformers import SentenceTransformer
+
 
 def get_dcos_from_features(features):
     # GET DCOS VALUES FOR STORY
@@ -39,17 +42,13 @@ def get_dsi(model_name, documents):
         model.eval()
         segmenter = PunktSentenceTokenizer()
         tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
-        cos = torch.nn.CosineSimilarity(dim=0)
                 
         # CREATE POST-EMBEDDING FILTERING LIST
         filter_list = np.array(['[CLS]', '[PAD]', '[SEP]', '.', ',', '!', '?'])
         
         print("Segmenting sentences and computing DSI...")  # print message to console
         # SEGMENT DATA INTO SENTENCES
-        for index, text in enumerate(documents):
-            print("Processing ID: " + str(index)) 
-            #import pdb; pdb.set_trace()
-
+        for index, text in enumerate(tqdm(documents)):
             # TRAIN SENTENCE SEGEMENTER AND SEGMENT SENTENCE
             segmenter.train(text) # train the segmenter on the text first 
             sentences = segmenter.tokenize(text) # apply the additionally-trained segmenter to the text
@@ -86,12 +85,11 @@ def get_dsi(model_name, documents):
 
         print("Segmenting sentences and computing DSI...")  # print message to console
         # SEGMENT DATA INTO SENTENCES
-        for index, text in enumerate(documents):
-            print("Processing ID: " + str(index)) 
-
+        for index, text in enumerate(tqdm(documents)):
             # TRAIN SENTENCE SEGMENTER AND SEGMENT SENTENCE
             segmenter.train(text)  # train the segmenter on the text first
             sentences = segmenter.tokenize(text)  # apply the additionally-trained segmenter to the text
+            print(sentences)
 
             # GET BGE SENTENCE FEATURES
             # BGE-large-en is a sentence embedding model, it provides a single vector for a sentence. Therefore, we will get sentence embeddings and calculate DSI based on sentence similarity.
@@ -116,9 +114,7 @@ def get_dsi(model_name, documents):
 
         print("Segmenting sentences and computing DSI...")  # print message to console
         # SEGMENT DATA INTO SENTENCES
-        for index, text in enumerate(documents):
-            print("Processing ID: " + str(index))  # print current participant ID to console
-
+        for index, text in enumerate(tqdm(documents)):
             # TRAIN SENTENCE SEGEMENTER AND SEGMENT SENTENCE
             segmenter.train(text) # train the segmenter on the text first (unsupervised algorithm that is pretrained and can improve with added training)
             sentences = segmenter.tokenize(text) # apply the additionally-trained segmenter to the text

@@ -1,0 +1,7 @@
+Corr(Human, LLM) on Problem ID Becky: 0.6408110422422758
+Corr(Human, LLM) on Problem ID Acme: 0.4394397631268329
+Corr(Human, LLM) on Problem ID Clara: 0.43943662321114124
+Corr(Human, LLM) on Problem ID Mike: 0.3553348049154057
+Corr(Human, LLM) on Problem ID Ralph: 0.35643804539730173
+Corr(Human, LLM) on Problem ID Joan: 0.5772620472645931
+Corr(Human, LLM) on full dataset: 0.499836561466258
