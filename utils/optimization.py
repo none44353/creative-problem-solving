@@ -1,9 +1,12 @@
-from utils.calculate_corr import calculate_correlation_after_outlier_removal, calculate_mse_after_outlier_removal
-from sklearn.linear_model import LinearRegression
-import pandas as pd
-import numpy as np
 import pygad
+import numpy as np
+import pandas as pd
+
 from scipy.optimize import minimize
+from sklearn.linear_model import Lasso, Ridge, LinearRegression
+
+from utils.calculate_corr import calculate_correlation_after_outlier_removal, calculate_mse_after_outlier_removal
+
 
 def get_tuple(data, dsi_type, prompt_type, peer_type):
     if dsi_type == "DSI":
@@ -104,7 +107,7 @@ def get_key_parameters(X, key_parameters):
 #     return best_solution
     
 
-def optimize_linear_corr(X_train, y_train):
+def optimize_linear_corr(X_train, y_train, method, alpha):
     '''根据X_train和y_train训练一个线性回归模型，使用Scipy的自定义优化函数，目标是最大化预测值与真实值y_train之间的pearsonr相关系数'''
     def objective(params):
         weights = params[:-1]
@@ -112,8 +115,16 @@ def optimize_linear_corr(X_train, y_train):
         y_pred = np.dot(X_train, weights) + intercept
         cutoff = 4 / (len(y_train) - 2) if len(y_train) > 2 else 0.1
         corr = calculate_correlation_after_outlier_removal(y_train, y_pred, cutoff)
+        
         # 目标是最大化相关系数，因此返回负值
-        return -corr
+        if method == "Linear":
+            target = -corr
+        elif method == "Lasso":
+            target = -corr + alpha * np.sum(np.abs(params))
+        elif method == "Ridge":
+            target = -corr + alpha * np.sum(params**2)
+        
+        return target
 
     best_corr = -np.inf
     best_solution = None
@@ -141,14 +152,22 @@ def optimize_linear_corr(X_train, y_train):
     
     return result.x
 
-def calculate_performance(training_data, testing_data, parameters, optimization_goal):
+def calculate_performance(training_data, testing_data, parameters, optimization_goal, method="Linear", alpha=None, max_iter=10000):
     full_X_train, y_train = training_data
     full_X_test, y_test = testing_data
     X_train = get_key_parameters(full_X_train, parameters)
     X_test = get_key_parameters(full_X_test, parameters)
 
     if optimization_goal == 'MSE':
-        model = LinearRegression(fit_intercept=True)
+        if method == "Linear":
+            model = LinearRegression(fit_intercept=True)
+        elif method == "Lasso":
+            model = Lasso(alpha=alpha if alpha is not None else 0.1, fit_intercept=True, max_iter=max_iter)
+        elif method == "Ridge":
+            model = Ridge(alpha=alpha if alpha is not None else 1.0, fit_intercept=True, max_iter=max_iter)
+        else:
+            raise ValueError("Unsupported method: {}".format(method))
+            
         model.fit(X_train, y_train)
         prediction = model.predict(X_test)
         print("Model coefficients & intercept:", model.coef_, model.intercept_)
@@ -156,18 +175,18 @@ def calculate_performance(training_data, testing_data, parameters, optimization_
         prediction_train = model.predict(X_train)
         training_corr = calculate_correlation_after_outlier_removal(y_train, prediction_train)
         training_mse = calculate_mse_after_outlier_removal(y_train, prediction_train)
-        print("Training Performance: MSE={}, CORR={}\n".format(training_mse, training_corr))
+        print("Training Performance: MSE={}, CORR={}".format(training_mse, training_corr))
+    
     elif optimization_goal == 'CORR':
-        print("Training Data:", X_train[:5], y_train[:5])
-        solution = optimize_linear_corr(np.array(X_train), np.array(y_train))
+        # print("Training Data:", [data[0].item() for data in X_train[:5]], [data.item() for data in y_train[:5]])
+        solution = optimize_linear_corr(np.array(X_train), np.array(y_train), method=method, alpha=alpha)
         prediction = np.dot(np.array(X_test), solution[:-1]) + solution[-1]
         print("Model coefficients & intercept:", solution)
         
-        # prediction_train = np.dot(np.array(X_train), solution[:-1]) + solution[-1]
-        # training_corr = calculate_correlation_after_outlier_removal(y_train, prediction_train)
-        # training_mse = calculate_mse_after_outlier_removal(y_train, prediction_train)
-        # print("Training Performance: MSE={}, CORR={}".format(training_mse, training_corr))
-        
+        prediction_train = np.dot(np.array(X_train), solution[:-1]) + solution[-1]
+        training_corr = calculate_correlation_after_outlier_removal(y_train, prediction_train)
+        training_mse = calculate_mse_after_outlier_removal(y_train, prediction_train)
+        print("Training Performance: MSE={}, CORR={}".format(training_mse, training_corr))
         
         # solution = genetic_algorithm(X_train, y_train, num_genes= len(parameters) + 1)
         # prediction = np.dot(X_test, solution[:-1]) + solution[-1]
@@ -178,4 +197,4 @@ def calculate_performance(training_data, testing_data, parameters, optimization_
 
     corr = calculate_correlation_after_outlier_removal(y_test, prediction)
     mse = calculate_mse_after_outlier_removal(y_test, prediction)
-    return corr, mse
+    return corr, mse, training_corr, training_mse

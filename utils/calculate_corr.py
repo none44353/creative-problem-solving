@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import mean_squared_error
+
 
 def data_after_outlier_removal(y_var, x_var, cutoff_val = None):
     if cutoff_val is None:
@@ -27,16 +28,18 @@ def data_after_outlier_removal(y_var, x_var, cutoff_val = None):
     return y_cleaned, x_cleaned
 
 def calculate_correlation_after_outlier_removal(y_var, x_var, cutoff_val = None):
-    y_cleaned, x_cleaned = data_after_outlier_removal(y_var, x_var, cutoff_val)
+    y_cleaned, x_cleaned = y_var, x_var # data_after_outlier_removal(y_var, x_var, cutoff_val)
+    
     # 计算移除异常值后的 Pearson 相关系数
     if len(x_cleaned) > 1:
-        correlation_after_removal, _ = pearsonr(y_cleaned, x_cleaned)
+        # correlation_after_removal, _ = pearsonr(y_cleaned, x_cleaned)
+        correlation_after_removal, _ = spearmanr(y_cleaned, x_cleaned)
     else:
         correlation_after_removal = np.nan # 数据点不足，无法计算相关性
     return correlation_after_removal
 
 def calculate_mse_after_outlier_removal(y_var, x_var, cutoff_val = None):
-    y_cleaned, x_cleaned = data_after_outlier_removal(y_var, x_var, cutoff_val)
+    y_cleaned, x_cleaned = y_var, x_var # data_after_outlier_removal(y_var, x_var, cutoff_val)
     # 计算移除异常值后的均方误差
     if len(x_cleaned) > 1:
         mse_after_removal = mean_squared_error(y_cleaned, x_cleaned)
@@ -47,10 +50,10 @@ def calculate_mse_after_outlier_removal(y_var, x_var, cutoff_val = None):
 
 def show_statistic(dataset):
     print("Size of Dataset:", len(dataset))
-    print("CORR DSI～FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['DSI']))
-    print("CORR promptCosDis～FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['promptCosDis']))
-    print("CORR peerCosDis～FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['peerCosDis']))
-    print("\n")
+    print("CORR DSI ~ FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['DSI']))
+    print("CORR promptCosDis ~ FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['promptCosDis']))
+    print("CORR peerCosDis ~ FacScoresO:", calculate_correlation_after_outlier_removal(dataset['FacScoresO'], dataset['peerCosDis']))
+    print()
     
     return
     
