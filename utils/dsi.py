@@ -43,6 +43,7 @@ def get_dsi(model_name, documents):
             # TRAIN SENTENCE SEGEMENTER AND SEGMENT SENTENCE
             segmenter.train(text) # train the segmenter on the text first 
             sentences = segmenter.tokenize(text) # apply the additionally-trained segmenter to the text
+            sentences = [subsentence for sentence in sentences for subsentence in sentence.split('\n')] # further split sentences by newline characters to avoid possible calculation problems when adding extra lines
 
             # LOOP OVER SENTENCES AND GET BERT FEATURES (LAYERS 6 & 7)
             features = []  # initialize list to store dcos values, one for each sentence
@@ -50,7 +51,7 @@ def get_dsi(model_name, documents):
                 sentence = sentences[i].translate(str.maketrans('', '', string.punctuation))
                 sent_tokens = tokenizer(sentence, max_length=50, truncation=True, padding='max_length', return_tensors="pt")
                 sent_words = [tokenizer.decode([k]) for k in sent_tokens['input_ids'][0]]
-                sent_indices = np.where(np.in1d(sent_words, filter_list, invert=True))[0]  # we'll use this to filter out special tokens and punctuation
+                sent_indices = np.where(np.isin(sent_words, filter_list, invert=True))[0]  # we'll use this to filter out special tokens and punctuation
                 with torch.no_grad():
                     sent_output = model(**sent_tokens) # feed model the sentence tokens and get outputs
                     hids = sent_output.hidden_states # isolate hidden layer activations
@@ -84,6 +85,7 @@ def get_dsi(model_name, documents):
             # TRAIN SENTENCE SEGEMENTER AND SEGMENT SENTENCE
             segmenter.train(text) # train the segmenter on the text first (unsupervised algorithm that is pretrained and can improve with added training)
             sentences = segmenter.tokenize(text) # apply the additionally-trained segmenter to the text
+            sentences = [subsentence for sentence in sentences for subsentence in sentence.split('\n')] # further split sentences by newline characters to avoid possible calculation problems when adding extra lines
 
             # LOOP OVER SENTENCES AND GET FEATURES (For BGE: Layers 6 & 7; For Qwen: Layers 7 & 8)
             features = []  # initialize list to store dcos values, one for each sentence
@@ -91,7 +93,7 @@ def get_dsi(model_name, documents):
                 sentence = sentences[i].translate(str.maketrans('', '', string.punctuation))
                 sent_tokens = tokenizer(sentence, max_length=50, truncation=True, padding='max_length', return_tensors="pt")
                 sent_words = [tokenizer.decode([k]) for k in sent_tokens['input_ids'][0]]
-                sent_indices = np.where(np.in1d(sent_words, filter_list, invert=True))[0]  # we'll use this to filter out special tokens and punctuation
+                sent_indices = np.where(np.isin(sent_words, filter_list, invert=True))[0]  # we'll use this to filter out special tokens and punctuation
                 with torch.no_grad():
                     sent_output = model(**sent_tokens) # feed model the sentence tokens and get outputs
                     hids = sent_output.hidden_states # isolate hidden layer activations

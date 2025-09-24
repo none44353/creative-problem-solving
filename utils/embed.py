@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn.functional as F
 
 from vllm import LLM
-from typing import List
+from typing import List, Optional
 from transformers import BertTokenizer, BertModel
 from sentence_transformers import SentenceTransformer
 
@@ -47,7 +47,7 @@ def get_bert_embeddings_batched(texts, batch_size=32):
         return torch.tensor([])
 
 
-def embed_solutions(problem_ID: str, solutions: List[str], embedding_model_label: str, embedding_model: str, save_path: str) -> None:
+def embed_solutions(problem_ID: str, solutions: List[str], embedding_model_label: str, embedding_model: str, save_path: Optional[str]) -> np.ndarray:
     # Currently only bert/bge/Qwen are supported as embedding models.
     assert embedding_model_label in ["bert", "bge", "Qwen"], f"Unsupported embedding model: {embedding_model_label}"
     
@@ -69,4 +69,6 @@ def embed_solutions(problem_ID: str, solutions: List[str], embedding_model_label
     # Normalize, turn into numpy format, and save the embeddings
     normalized_embeddings = F.normalize(embeddings, p=2, dim=1)
     numpy_embeddings = normalized_embeddings.cpu().numpy()
-    np.save(save_path, numpy_embeddings)
+    if save_path is not None:
+        np.save(save_path, numpy_embeddings)
+    return numpy_embeddings
