@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import numpy as np
 import pandas as pd
@@ -103,47 +104,7 @@ for embedding_model, embedding_model_label in zip(embedding_model_list, embeddin
                 save_path=embedding_path
             )
 
-# Step 3: Calculate prompt & peer cosine distances.
-embedding_model_label_list = ["bert", "bge", "Qwen"]
-
-for embedding_model_label in embedding_model_label_list:
-    original_dataset[f'AttackedPromptCosDis-{embedding_model_label}'] = float('nan')
-    original_dataset[f'AttackedPeerCosDis-{embedding_model_label}'] = float('nan')
-
-for embedding_model_label in embedding_model_label_list:
-    for problem_ID in all_problem_IDs:
-        embedding_directory = f"Data/embeddings/{embedding_model_label}/{problem_ID}/"
-        
-        # Load the original embeddings, and extract the query embedding (the first one).
-        original_embeddings = np.load(os.path.join(embedding_directory, "normalized_text_embeddings.npy"))
-        query_embedding = original_embeddings[0]
-        
-        # Load the attacked embeddings.
-        attacked_embeddings = np.load(os.path.join(embedding_directory, f"normalized_{attack_method}_attacked_text_embeddings.npy"))
-        
-        # Calculate prompt/peer cosine distances.
-        prompt_cos_distances = get_prompt_distance_from_embeddings(query_embedding, attacked_embeddings)
-        peer_cos_distances = get_peer_distance_from_embeddings(attacked_embeddings)
-        
-        # Store the results back to the original dataset.
-        original_dataset.loc[original_dataset['ProblemID'] == problem_ID, f'AttackedPromptCosDis-{embedding_model_label}'] = prompt_cos_distances
-        original_dataset.loc[original_dataset['ProblemID'] == problem_ID, f'AttackedPeerCosDis-{embedding_model_label}'] = peer_cos_distances
-    
-    # Organize a specific version for later performance analysis.
-    if not os.path.exists(f"Results/{embedding_model_label}/final_{attack_method}_attacked.csv"):
-        final_df = pd.DataFrame(columns=["...1", "Solutions", "FacScoresQ", "FacScoresO", "Dataset", "ProblemID", "set", "ID", "wordcount", "DSI", "promptCosDis", "peerCosDis"])
-        for column in final_df.columns:
-            if column == "Solutions":
-                final_df[column] = original_dataset["AttackedSolutions"]
-            elif column == "DSI":
-                final_df[column] = original_dataset["AttackedDSI"] if embedding_model_label == "bert" else original_dataset[f"Attacked{embedding_model_label.capitalize()}DSI"]
-            elif "CosDis" in column:
-                final_df[column] = original_dataset[f"Attacked{column[0].capitalize()+column[1:]}-{embedding_model_label}"]
-            else:
-                final_df[column] = original_dataset[column]
-        final_df.to_csv(f"Results/{embedding_model_label}/final_{attack_method}_attacked.csv", index=False)
-    
-# Step 4: Test if the performance of LLM decreases on the attacked solutions.
+# Step 3: Test if the performance of LLM decreases on the attacked solutions.
 with open(os.path.join("prompts/zero-shot.txt"), 'r') as file:
     prompt_template = Template(file.read())
     
@@ -174,6 +135,52 @@ elif attack_method == "zeroscore":
     timestamp = "20250925_144834"
 originality_scores = getOutputs("test", timestamp)
 original_dataset[f"{model.split('/')[-1]}-0s-attacked"] = originality_scores
+
+# Step 4: Calculate prompt & peer cosine distances.
+embedding_model_label_list = ["bert", "bge", "Qwen"]
+
+for embedding_model_label in embedding_model_label_list:
+    original_dataset[f'AttackedPromptCosDis-{embedding_model_label}'] = float('nan')
+    original_dataset[f'AttackedPeerCosDis-{embedding_model_label}'] = float('nan')
+
+for embedding_model_label in embedding_model_label_list:
+    for problem_ID in all_problem_IDs:
+        embedding_directory = f"Data/embeddings/{embedding_model_label}/{problem_ID}/"
+        
+        # Load the original embeddings, and extract the query embedding (the first one).
+        original_embeddings = np.load(os.path.join(embedding_directory, "normalized_text_embeddings.npy"))
+        query_embedding = original_embeddings[0]
+        
+        # Load the attacked embeddings.
+        attacked_embeddings = np.load(os.path.join(embedding_directory, f"normalized_{attack_method}_attacked_text_embeddings.npy"))
+        
+        # Calculate prompt/peer cosine distances.
+        prompt_cos_distances = get_prompt_distance_from_embeddings(query_embedding, attacked_embeddings)
+        peer_cos_distances = get_peer_distance_from_embeddings(attacked_embeddings)
+        
+        # Store the results back to the original dataset.
+        original_dataset.loc[original_dataset['ProblemID'] == problem_ID, f'AttackedPromptCosDis-{embedding_model_label}'] = prompt_cos_distances
+        original_dataset.loc[original_dataset['ProblemID'] == problem_ID, f'AttackedPeerCosDis-{embedding_model_label}'] = peer_cos_distances
+    
+    # Organize a specific version for later performance analysis.
+    if not os.path.exists(f"Results/{embedding_model_label}/final_{attack_method}_attacked.csv"):
+        final_df = pd.DataFrame(columns=["Solutions", "FacScoresQ", "FacScoresO", "Dataset", "ProblemID", "set", "ID", "wordcount", "DSI", "promptCosDis", "peerCosDis", f"{model.split('/')[-1]}-0s"])
+        for column in final_df.columns:
+            if column == "Solutions":
+                final_df[column] = original_dataset["AttackedSolutions"]
+            elif column == "DSI":
+                final_df[column] = original_dataset["AttackedDSI"] if embedding_model_label == "bert" else original_dataset[f"Attacked{embedding_model_label.capitalize()}DSI"]
+            elif "CosDis" in column:
+                final_df[column] = original_dataset[f"Attacked{column[0].capitalize()+column[1:]}-{embedding_model_label}"]
+            elif column == "wordcount":
+                final_df[column] = [
+                    len(re.findall(r'\w+', sol.replace("½", ""))) for sol in final_df["Solutions"].to_list()
+                ]
+            elif column == f"{model.split('/')[-1]}-0s":
+                final_df[column] = original_dataset[f"{model.split('/')[-1]}-0s-attacked"]
+            else:
+                final_df[column] = original_dataset[column]
+        final_df.to_csv(f"Results/{embedding_model_label}/final_{attack_method}_attacked.csv", index=False)
     
 # Step 5: Save the updated dataset with new metrics.
 if not os.path.exists(f"Data/final_{attack_method}_attacked.csv"):
